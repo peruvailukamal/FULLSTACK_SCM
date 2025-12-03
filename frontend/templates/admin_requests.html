@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Admin Requests - SCMXpertLite{% endblock %}
+{% block content %}
+<section>
+    <div style="margin-bottom: 1rem;">
+        <h1>Admin Requests</h1>
+        <p style="color:var(--text-muted)">Review and manage pending admin access requests.</p>
+    </div>
+
+    <div class="glass-card" id="requestsCard">
+        <div id="requestsList">Loading requests...</div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(async function(){
+    try {
+        const res = await getJSON('/api/v1/admin/requests');
+        if(!res.ok) { document.getElementById('requestsList').innerText = 'Failed to load requests.'; return; }
+        const list = await res.json();
+        const container = document.getElementById('requestsList');
+        container.innerHTML = '';
+        if(!list.length) { container.innerHTML = '<div style="color:var(--text-muted)">No pending requests.</div>'; return; }
+        list.forEach(u => {
+            const row = document.createElement('div');
+            row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.marginBottom='0.6rem';
+            row.style.padding='0.6rem'; row.style.border='1px solid var(--glass-border)'; row.style.borderRadius='8px';
+            row.innerHTML = `<div><strong>${u.username}</strong><br><small style='color:var(--text-muted)'>${u.email}</small></div>`;
+            const actions = document.createElement('div');
+            const approve = document.createElement('button'); approve.className='btn btn-primary'; approve.style.marginRight='0.5rem'; approve.textContent='Approve';
+            const reject = document.createElement('button'); reject.className='btn btn-ghost'; reject.textContent='Reject';
+            approve.onclick = async ()=>{ const r = await postJSON(`/api/v1/admin/approve/${u.id}`, {}, true); const j = await r.json(); alert(j.message || 'Approved'); location.reload(); };
+            reject.onclick = async ()=>{ const r = await postJSON(`/api/v1/admin/reject/${u.id}`, {}, true); const j = await r.json(); alert(j.message || 'Rejected'); location.reload(); };
+            actions.appendChild(approve); actions.appendChild(reject);
+            row.appendChild(actions);
+            container.appendChild(row);
+        });
+    } catch(e){ document.getElementById('requestsList').innerText = 'Error loading requests'; }
+})();
+</script>
+{% endblock %}

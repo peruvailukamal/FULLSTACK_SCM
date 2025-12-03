@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}My Shipments - SCMXpertLite{% endblock %}
+
+{% block content %}
+<style>
+    /* Wide Layout for Table View */
+    .wide-layout { 
+        width: 95vw; 
+        max-width: 1800px; 
+        margin-left: 50%; 
+        transform: translateX(-50%); 
+    }
+
+    /* --- Filter Card --- */
+    .filter-card {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(5, 5, 15, 0.95));
+        border: 1px solid var(--glass-border);
+        border-radius: var(--card-radius);
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        position: relative; 
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    
+    /* Neon Line Decoration */
+    .filter-card::after {
+        content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px;
+        background: linear-gradient(90deg, transparent, var(--primary), var(--accent), transparent);
+    }
+
+    .filter-controls { 
+        display: flex; 
+        justify-content: center; 
+        gap: 1.5rem; 
+        align-items: flex-end; 
+        flex-wrap: wrap; 
+    }
+    
+    .select-wrapper { text-align: left; min-width: 280px; }
+    
+    .filter-input {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        color: white; 
+        padding: 12px 16px; 
+        border-radius: 12px;
+        width: 100%; 
+        font-size: 1rem; 
+        outline: none; 
+        transition: 0.3s;
+    }
+    .filter-input:focus { 
+        border-color: var(--accent); 
+        background: rgba(0,0,0,0.4); 
+        box-shadow: 0 0 15px rgba(76, 201, 240, 0.1);
+    }
+    .filter-input option { background: #0f172a; color: white; }
+
+    /* --- Table Styles --- */
+    .table-container {
+        padding: 0; 
+        overflow: hidden; 
+        border: none;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        border-radius: var(--card-radius);
+        border: 1px solid var(--glass-border);
+    }
+
+    .data-table { 
+        width: 100%; 
+        border-collapse: separate; 
+        border-spacing: 0; 
+        font-size: 0.95rem; 
+    }
+    
+    .data-table thead th {
+        background: rgba(123, 47, 247, 0.15); /* Tinted header */
+        color: var(--accent);
+        padding: 1.2rem;
+        text-align: center; /* CENTERED HEADER */
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 1px;
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .data-table tbody tr { transition: background 0.2s; }
+    .data-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
+    .data-table tbody tr:hover { background: rgba(76, 201, 240, 0.08); }
+    
+    .data-table td { 
+        padding: 1.2rem; 
+        border-bottom: 1px solid rgba(255,255,255,0.03); 
+        vertical-align: middle; 
+        text-align: center; /* CENTERED CONTENT */
+        color: #e2e8f0;
+    }
+</style>
+
+<section>
+    <!-- Filter Section -->
+    <div class="filter-card wide-layout">
+        <h2 style="text-align: center; margin-bottom: 0.5rem; font-weight: 700; color: white;">Manifest Search</h2>
+        <p style="text-align: center; color: var(--text-muted); margin-bottom: 1.5rem;">Filter and manage active logistics</p>
+        
+        <div class="filter-controls">
+            <div class="select-wrapper">
+                <label style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 6px; display:block;">Filter Key</label>
+                <select id="searchKey" class="filter-input">
+                    <option value="ALL">View All Shipments</option>
+                    <option value="Shipment_Number" selected>Shipment Number</option>
+                    <option value="Device">Device Id</option>
+                    <option value="Route_Details">Route</option>
+                    <option value="Goods_Type">Goods Type</option>
+                </select>
+            </div>
+            <div class="select-wrapper">
+                <label style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 6px; display:block;">Search Term</label>
+                <input type="text" id="searchValue" class="filter-input" placeholder="Enter keyword...">
+            </div>
+            <button id="btnSearch" class="btn btn-primary" style="height: 48px; margin-top: 22px;">SEARCH</button>
+            <button id="btnReset" class="btn btn-ghost" style="height: 48px; margin-top: 22px;">RESET</button>
+        </div>
+    </div>
+
+    <!-- Table Section -->
+    <div class="table-container wide-layout">
+        <div style="overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Shipment #</th>
+                        <th>Device ID</th>
+                        <th>Battery</th>
+                        <th>Temp</th>
+                        <th>Route</th>
+                        <th>Delivery ETA</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="7" style="padding: 4rem; color: var(--text-muted);">Initiate search to view data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allShipments = [];
+
+    // Initialize: Fetch data
+    (async function init() {
+        try {
+            const res = await getJSON('/api/v1/shipments');
+            if(res.ok) allShipments = await res.json();
+        } catch(e) { console.error(e); }
+    })();
+
+    // Input behavior based on dropdown
+    document.getElementById('searchKey').addEventListener('change', function() {
+        const valInput = document.getElementById('searchValue');
+        if (this.value === 'ALL') { valInput.value = ''; valInput.disabled = true; valInput.placeholder = 'Click Search...'; }
+        else { valInput.disabled = false; valInput.placeholder = 'Enter value...'; }
+    });
+
+    // Button Listeners
+    document.getElementById('btnSearch').addEventListener('click', performSearch);
+    document.getElementById('btnReset').addEventListener('click', () => {
+        document.getElementById('searchValue').value = '';
+        document.getElementById('searchKey').value = "Shipment_Number";
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" style="padding:4rem; color:var(--text-muted);">Ready to search.</td></tr>';
+    });
+
+    function performSearch() {
+        const key = document.getElementById('searchKey').value;
+        const val = document.getElementById('searchValue').value.toLowerCase().trim();
+        let filteredData = (key === 'ALL') ? allShipments : allShipments.filter(item => String(item[key]||'').toLowerCase().includes(val));
+        renderTable(filteredData);
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        if(data.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="padding:3rem; color: var(--secondary);">No results found.</td></tr>'; return; }
+
+        data.forEach(s => {
+            // Simulated sensor data for visual flavor
+            const bat = (Math.random() * (100 - 40) + 40).toFixed(0);
+            const temp = (Math.random() * (25 - 18) + 18).toFixed(1);
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="color:white; font-weight:600; font-family:'JetBrains Mono';">${s.Shipment_Number}</td>
+                <td style="color:var(--text-muted);">${s.Device}</td>
+                <td><span style="color:#00ff88; background:rgba(0,255,136,0.1); padding:2px 8px; border-radius:4px; font-size:0.8rem;">${bat}%</span></td>
+                <td>${temp}°C</td>
+                <td style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.Route_Details}</td>
+                <td>${s.Expected_Delivery_Date ? new Date(s.Expected_Delivery_Date).toLocaleDateString() : 'N/A'}</td>
+                <td style="font-size:0.8rem; color:var(--text-muted);">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+</script>
+{% endblock %}

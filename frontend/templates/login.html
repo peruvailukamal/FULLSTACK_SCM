@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Sign In - SCMXpertLite{% endblock %}
+
+{% block content %}
+<style>
+    /* Login specific styling that uses theme variables from base */
+    .auth-wrapper { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:22px; }
+    .login-card {
+        width:100%; max-width:420px; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border:1px solid var(--glass-border); border-radius:14px; padding:34px; box-shadow: 0 18px 50px rgba(3,6,23,0.6); position:relative; overflow:hidden;
+        transition: transform .4s, box-shadow .4s; will-change:transform;
+    }
+    .login-card::after{ content:''; position:absolute; right:-120px; top:-60px; width:260px; height:260px; background: radial-gradient(circle at 30% 30%, rgba(124,92,255,0.12), transparent 30%); transform:rotate(20deg); pointer-events:none; }
+    .login-card:hover{ transform: translateY(-6px); box-shadow: 0 36px 80px rgba(3,6,23,0.7); }
+    .login-card h2{ color:var(--text-main); font-size:1.8rem; font-weight:800; margin-bottom:6px; }
+    .login-card p.muted{ color:var(--text-muted); font-size:.92rem; margin-bottom:18px; }
+    .input-group{ margin-bottom:14px; text-align:left; }
+    .input-field{ width:100%; background: rgba(6,8,12,0.28); border:1px solid var(--glass-border); color:var(--text-main); padding:12px 14px; border-radius:10px; font-size:.96rem; transition: box-shadow .2s, border-color .2s; }
+    .input-field:focus{ border-color:var(--secondary); box-shadow: 0 8px 24px rgba(0,229,255,0.06); outline:none; }
+    .btn-auth{ width:100%; padding:13px; border-radius:999px; border:none; background: linear-gradient(90deg,var(--primary),var(--secondary)); color:#071021; font-weight:800; text-transform:uppercase; cursor:pointer; margin-top:8px; box-shadow: 0 10px 30px rgba(124,92,255,0.14); transition: transform .18s; }
+    .btn-auth:hover{ transform: translateY(-3px); }
+    .link-text{ color:var(--secondary); font-size:.92rem; text-decoration:none; transition: color .16s; }
+    .link-text:hover{ color:var(--primary); text-decoration:underline; }
+    .error-msg{ color: var(--accent); font-size:.88rem; margin-top:10px; min-height:20px; }
+    .flex-center{ display:flex; justify-content:center; align-items:center; }
+    .bottom-text{ margin-top:18px; color:var(--text-muted); font-size:.92rem; }
+
+    @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+    .login-card, .input-group, .btn-auth { animation: fadeIn .45s ease both; }
+</style>
+
+<div class="auth-wrapper">
+    <div class="login-card">
+        
+        <!-- 1. LOGIN CONTAINER -->
+        <div id="login-container">
+            <h2>SCMXpertLite</h2>
+            <p class="muted">Sign in to your account</p>
+            
+            <form id="loginForm">
+                <div class="input-group">
+                    <input name="email" type="email" class="input-field" placeholder="Email Address" required />
+                </div>
+                <div class="input-group">
+                    <input name="password" type="password" class="input-field" placeholder="Password" required />
+                </div>
+
+                <div style="text-align: right; margin-bottom: 15px;">
+                    <a href="#" id="showForgot" class="link-text">Forgot password?</a>
+                </div>
+
+                <div style="margin-bottom: 15px;" class="flex-center">
+                    <div class="g-recaptcha" data-sitekey="{{ RECAPTCHA_SITE_KEY }}" data-theme="dark"></div>
+                </div>
+
+                <div id="loginMessage" class="error-msg"></div>
+
+                <button type="submit" class="btn-auth">Sign In</button>
+            </form>
+
+            <!-- Social sign-in removed -->
+
+            <p class="bottom-text">
+                Don't have an account? <a href="/signup" class="link-text">Sign Up</a>
+            </p>
+        </div>
+
+        <!-- 2. FORGOT PASSWORD CONTAINER (Updated for OTP) -->
+        <div id="forgot-container" style="display: none;">
+            <h2>Reset Password</h2>
+            <p class="muted">Secure Account Recovery</p>
+
+            <!-- STEP 1: Request OTP -->
+            <form id="step1Form">
+                <div class="input-group">
+                    <input id="reset_email" type="email" class="input-field" placeholder="Registered Email" required />
+                </div>
+                <button type="submit" class="btn-auth">Send OTP</button>
+            </form>
+
+            <!-- STEP 2: Verify OTP (Hidden initially) -->
+            <form id="step2Form" style="display: none; animation: fadeIn 0.5s;">
+                <div style="background: rgba(0,210,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px; color: #00d2ff; font-size: 0.85rem;">
+                    OTP sent to your email.
+                </div>
+                
+                <div class="input-group">
+                    <input id="otp_input" type="text" class="input-field" placeholder="Enter 6-Digit OTP" maxlength="6" style="text-align: center; letter-spacing: 5px; font-size: 1.1rem;" required />
+                </div>
+                <div class="input-group">
+                    <input id="new_pass_input" type="password" class="input-field" placeholder="New Password" minlength="8" required />
+                </div>
+
+                <button type="submit" class="btn-auth">Reset Password</button>
+            </form>
+
+            <div id="forgotMessage" class="error-msg"></div>
+
+            <div style="margin-top: 25px;">
+                <a href="#" id="showLogin" class="link-text" style="font-weight: 600;">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Login
+                </a>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- kept animations inside main login style block -->
+{% endblock %}
+
+{% block scripts %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+<script>
+    // --- UI TOGGLES ---
+    const loginBox = document.getElementById('login-container');
+    const forgotBox = document.getElementById('forgot-container');
+    
+    // Forgot Password Internal Forms
+    const step1Form = document.getElementById('step1Form');
+    const step2Form = document.getElementById('step2Form');
+    
+    const showForgotBtn = document.getElementById('showForgot');
+    const showLoginBtn = document.getElementById('showLogin');
+    
+    const loginMsg = document.getElementById('loginMessage');
+    const forgotMsg = document.getElementById('forgotMessage');
+
+    let resetEmail = ""; // Store email between steps
+
+    // Switch to Forgot Password View
+    showForgotBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        loginBox.style.display = 'none';
+        forgotBox.style.display = 'block';
+        
+        // Reset Forgot Password state
+        step1Form.style.display = 'block';
+        step2Form.style.display = 'none';
+        step1Form.reset();
+        step2Form.reset();
+        forgotMsg.textContent = '';
+        loginMsg.textContent = '';
+    });
+
+    // Switch back to Login View
+    showLoginBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        forgotBox.style.display = 'none';
+        loginBox.style.display = 'block';
+        forgotMsg.textContent = '';
+    });
+
+    // --- 1. LOGIN LOGIC (Existing) ---
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        loginMsg.style.color = '#94a3b8';
+        loginMsg.textContent = 'Verifying credentials...';
+
+        const recaptchaToken = grecaptcha.getResponse();
+        if(recaptchaToken.length === 0) {
+            loginMsg.style.color = '#ff4b4b';
+            loginMsg.textContent = "Please verify you are not a robot.";
+            return;
+        }
+
+        const data = new FormData(e.target);
+        const payload = new URLSearchParams({username: data.get('email'), password: data.get('password')});
+
+        try {
+            const res = await fetch('/api/v1/token', {
+                method:'POST', 
+                headers:{
+                    'Content-Type':'application/x-www-form-urlencoded',
+                    'x-recaptcha-token': recaptchaToken 
+                }, 
+                body: payload
+            });
+            const json = await res.json();
+            
+            if(res.ok) {
+                localStorage.setItem('scm_token', json.access_token);
+                loginMsg.style.color = '#00ff88';
+                loginMsg.textContent = 'Login Successful! Redirecting...';
+                setTimeout(() => window.location.href = '/dashboard', 800);
+            } else {
+                loginMsg.style.color = '#ff4b4b';
+                loginMsg.textContent = json.detail || 'Login failed';
+                grecaptcha.reset();
+            }
+        } catch(err) { 
+            loginMsg.style.color = '#ff4b4b';
+            loginMsg.textContent = 'Server connection error';
+            grecaptcha.reset(); 
+        }
+    });
+
+    // --- 2. FORGOT PASSWORD LOGIC (New OTP Flow) ---
+    
+    // Step 1: Request OTP
+    step1Form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        resetEmail = document.getElementById('reset_email').value;
+        forgotMsg.style.color = '#94a3b8';
+        forgotMsg.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending OTP...';
+
+        try {
+            const res = await fetch('/api/v1/forgot-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: resetEmail})
+            });
+            
+            if(res.ok) {
+                // Success: Hide Step 1, Show Step 2
+                step1Form.style.display = 'none';
+                step2Form.style.display = 'block';
+                forgotMsg.textContent = ''; 
+            } else {
+                forgotMsg.style.color = '#ff4b4b';
+                forgotMsg.textContent = 'Failed to send OTP. Try again.';
+            }
+        } catch(err) {
+            forgotMsg.style.color = '#ff4b4b';
+            forgotMsg.textContent = 'Network error.';
+        }
+    });
+
+    // Step 2: Verify OTP & Reset
+    step2Form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const otp = document.getElementById('otp_input').value;
+        const newPass = document.getElementById('new_pass_input').value;
+
+        forgotMsg.style.color = '#94a3b8';
+        forgotMsg.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Updating...';
+
+        try {
+            const res = await fetch('/api/v1/reset-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    email: resetEmail,
+                    otp: otp,
+                    new_password: newPass
+                })
+            });
+            
+            const json = await res.json();
+
+            if(res.ok) {
+                forgotMsg.style.color = '#00ff88';
+                forgotMsg.textContent = '✔ Password Reset Successful! Redirecting...';
+                setTimeout(() => {
+                    // Go back to login screen automatically
+                    forgotBox.style.display = 'none';
+                    loginBox.style.display = 'block';
+                    forgotMsg.textContent = '';
+                }, 2000);
+            } else {
+                forgotMsg.style.color = '#ff4b4b';
+                forgotMsg.textContent = json.detail || 'Invalid OTP';
+            }
+        } catch(err) {
+            forgotMsg.style.color = '#ff4b4b';
+            forgotMsg.textContent = 'Server error during reset.';
+        }
+    });
+
+    // Google SSO disabled — removed server-side support.
+</script>
+{% endblock %}

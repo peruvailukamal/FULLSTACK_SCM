@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Live Stream - SCMXpertLite{% endblock %}
+
+{% block content %}
+<style>
+    /* Layout - Centered Container */
+    .wide-layout { 
+        width: 75vw; 
+        max-width: 1600px; 
+        margin: 0 auto; /* Ensures horizontal centering */
+    }
+
+    /* Status Badge */
+    .status-badge { 
+        display: inline-flex; align-items: center; gap: 8px; 
+        padding: 8px 20px; border-radius: 30px; 
+        background: rgba(255,255,255,0.02); 
+        border: 1px solid var(--glass-border); 
+        font-size: 0.9rem; font-weight: 600; 
+        color: var(--text-muted); 
+        transition: all 0.3s ease;
+    }
+    .status-badge.active { 
+        border-color: rgba(0, 255, 136, 0.5); 
+        background: rgba(0, 255, 136, 0.1); 
+        color: #00ff88; 
+        box-shadow: 0 0 20px rgba(0, 255, 136, 0.2); 
+    }
+    
+    .status-dot { 
+        width: 10px; height: 10px; 
+        border-radius: 50%; 
+        background: currentColor; 
+        box-shadow: 0 0 10px currentColor; 
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
+        100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* Battery Pill */
+    .battery-pill { padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: 700; }
+    .bat-high { background: rgba(147, 173, 161, 0.15); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3); }
+    .bat-med { background: rgba(255, 200, 0, 0.15); color: #ffc800; border: 1px solid rgba(255, 200, 0, 0.3); }
+    .bat-low { background: rgba(255, 75, 75, 0.15); color: #ff4b4b; border: 1px solid rgba(255, 75, 75, 0.3); }
+
+    /* Table Styling */
+    .stream-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; }
+    
+    .stream-table th {
+        padding: 1.5rem;
+        text-align: center; /* CENTERED HEADER */
+        color: var(--accent);
+        font-size: 0.9rem;
+        background: rgba(5, 5, 15, 0.95);
+        position: sticky; top: 0; z-index: 10;
+        border-bottom: 1px solid var(--glass-border);
+        letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+
+    .stream-table td {
+        padding: 1.2rem;
+        text-align: center; /* CENTERED CONTENT */
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        vertical-align: middle;
+        font-size: 1rem;
+    }
+
+    /* Row Animation */
+    .stream-row { animation: fadeInSlide 0.5s ease-out; }
+    @keyframes fadeInSlide {
+        from { opacity: 0; transform: translateY(-15px); background: rgba(123, 47, 247, 0.15); }
+        to { opacity: 1; transform: translateY(0); background: transparent; }
+    }
+</style>
+
+<section>
+    <div class="glass-card wide-layout" style="height: 85vh; display: flex; flex-direction: column; overflow: hidden; padding: 0; border-color: var(--primary);">
+        
+        <!-- Header: Centered Content -->
+        <div style="padding: 2rem; border-bottom: 1px solid var(--glass-border); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1rem; background: rgba(0,0,0,0.3);">
+            
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <i class="fa-solid fa-satellite-dish" style="color: var(--primary); font-size: 2rem;"></i>
+                <h2 style="font-size: 1.8rem; margin: 0; color: white; letter-spacing: 1px;">Device Telemetry Stream</h2>
+            </div>
+            
+            <div id="statusBadge" class="status-badge active">
+                <span class="status-dot"></span>
+                <span id="statusText">ESTABLISHING UPLINK...</span>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div style="overflow-y: auto; flex: 1; padding: 0; scrollbar-width: thin;">
+            <table class="stream-table">
+                <thead>
+                    <tr>
+                        <th>Shipment ID</th>
+                        <th>Device ID</th>
+                        <th>Temperature</th>
+                        <th>Route Info</th>
+                        <th>Battery</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="streamBody">
+                    <tr id="empty">
+                        <td colspan="6" style="padding: 5rem; text-align: center; color: var(--text-muted);">
+                            <i class="fa-solid fa-circle-notch fa-spin fa-3x" style="color: var(--primary);"></i><br><br>
+                            <span style="font-size: 1.2rem; letter-spacing: 1px;">WAITING FOR SATELLITE DATA...</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const statusBadge = document.getElementById('statusBadge');
+    const statusText = document.getElementById('statusText');
+    const tbody = document.getElementById('streamBody');
+    const empty = document.getElementById('empty');
+    
+    let eventSource = null;
+
+    // Helper: Battery Class
+    function getBatteryClass(val) {
+        let batteryValue = 0;
+        if (val.includes('V')) {
+            const voltage = parseFloat(val);
+            batteryValue = Math.max(0, Math.min(100, ((voltage - 2.0) / 3.0) * 100));
+        } else {
+            batteryValue = parseInt(val) || 0;
+        }
+        if(batteryValue > 50) return 'bat-high';
+        if(batteryValue > 20) return 'bat-med';
+        return 'bat-low';
+    }
+
+    // Helper: Render Row
+    function renderRow(d) {
+        if(empty) empty.remove();
+        
+        // Update Status to Active on first data receive
+        statusText.textContent = "LIVE UPLINK ACTIVE";
+        
+        const tr = document.createElement('tr');
+        tr.className = 'stream-row'; 
+        
+        tr.innerHTML = `
+            <td style="color: white; font-weight: 700;">${d.Shipment_Number || '—'}</td>
+            <td style="color: var(--text-muted);">${d.Device || '—'}</td>
+            <td style="color: white;">${d.Temperature || '—'}</td>
+            <td style="color: var(--text-muted); font-size: 0.9rem;">${d.Location || d.Route_Details || '—'}</td>
+            <td>
+                <span class="battery-pill ${getBatteryClass(d.Battery)}">${d.Battery || '0%'}</span>
+            </td>
+            <td style="color: var(--text-muted); font-size: 0.9rem;">
+                ${d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : '--:--:--'}
+            </td>
+        `;
+        
+        tbody.insertBefore(tr, tbody.firstChild);
+        // Keep buffer size manageable (50 rows)
+        if(tbody.children.length > 50) tbody.removeChild(tbody.lastChild); 
+    }
+
+    // Auto Start Function
+    function initStream() {
+        console.log("Initializing EventSource...");
+        eventSource = new EventSource('/events');
+        
+        eventSource.onopen = () => {
+            statusBadge.className = 'status-badge active';
+            statusText.textContent = "SIGNAL ACQUIRED. WAITING FOR DATA...";
+        };
+
+        eventSource.onmessage = (e) => {
+            try { renderRow(JSON.parse(e.data)); } 
+            catch(err) { console.error(err); }
+        };
+
+        eventSource.onerror = () => {
+            if (eventSource.readyState === EventSource.CLOSED) return;
+            statusBadge.className = 'status-badge paused'; // Red style defined in CSS if needed, or remove class 'active'
+            statusBadge.classList.remove('active');
+            statusText.textContent = "SIGNAL LOST. RECONNECTING...";
+        };
+    }
+
+    // Start immediately
+    initStream();
+
+    // Cleanup
+    window.addEventListener('beforeunload', () => { if(eventSource) eventSource.close(); });
+</script>
+{% endblock %}

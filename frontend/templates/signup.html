@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Sign Up - SCMXpertLite{% endblock %}
+{% block content %}
+<style>
+    .password-wrapper { position: relative; }
+    .password-toggle { position:absolute; right:14px; top:50%; transform:translateY(-50%); color:var(--text-muted); cursor:pointer; transition: color .18s, transform .18s; }
+    .password-toggle:hover { color:var(--secondary); transform: translateY(-50%) scale(1.05); }
+
+    /* Input validity states */
+    .form-input.text-invalid { color: #ff6b6b !important; border-color: #ff6b6b !important; box-shadow: 0 6px 24px rgba(255,107,107,0.08); }
+    .form-input.text-valid { color: #9bffcf !important; border-color: #9bffcf !important; box-shadow: 0 6px 24px rgba(155,255,207,0.06); }
+
+    .info-wrapper { position: relative; display:flex; justify-content:flex-end; margin-top:-10px; margin-bottom:14px; }
+    .info-btn { font-size:0.85rem; color:var(--secondary); cursor:pointer; display:inline-flex; align-items:center; gap:8px; background: rgba(255,255,255,0.02); padding:6px 12px; border-radius:999px; border:1px solid var(--glass-border); transition: all .18s; }
+    .info-btn:hover { background: linear-gradient(90deg, rgba(124,92,255,0.06), rgba(0,229,255,0.03)); color:var(--text-main); }
+
+    .requirements-tooltip { position:absolute; top:36px; right:0; width: 280px; background: linear-gradient(180deg, rgba(8,10,16,0.96), rgba(12,14,20,0.95)); border:1px solid var(--glass-border); padding:12px; border-radius:10px; box-shadow: 0 16px 40px rgba(2,6,23,0.6); z-index:120; opacity:0; visibility:hidden; transform:translateY(-8px); transition: all .22s cubic-bezier(.2,.9,.3,1); pointer-events:none; }
+    .info-wrapper:hover .requirements-tooltip { opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; }
+
+    .req-item { display:flex; align-items:center; gap:10px; font-size:0.85rem; margin-bottom:8px; color:var(--text-muted); transition: color .18s; }
+    .req-item i { width:14px; height:14px; display:inline-flex; align-items:center; justify-content:center; }
+    .req-item.valid { color: #9bffcf; }
+    .req-item.invalid { color: #ff8b8b; }
+
+    button:disabled { opacity:.6; cursor:not-allowed; filter: grayscale(.4); }
+
+    /* subtle entrance for the card */
+    .glass-card { animation: floatIn .56s cubic-bezier(.2,.9,.3,1); }
+</style>
+
+<div style="min-height: 80vh; display:flex; align-items:center; justify-content:center;">
+    <div class="glass-card" style="width: 100%; max-width: 480px;">
+        <h2 style="text-align:center; font-size: 2rem;">Create Account</h2>
+        <p style="text-align:center; color: var(--text-muted); margin-bottom: 2rem;">Initialize new logistics profile</p>
+
+        <form id="signupForm">
+            <!-- Username -->
+            <div class="form-group">
+                <input name="username" type="text" class="form-input" placeholder=" " required />
+                <label class="form-label">Username</label>
+            </div>
+
+            <!-- Email -->
+            <div class="form-group">
+                <input name="email" type="email" class="form-input" placeholder=" " required />
+                <label class="form-label">Email Address</label>
+            </div>
+            
+            <!-- Password Field -->
+            <div class="form-group password-wrapper">
+                <input id="passInput" name="password" type="password" class="form-input" placeholder=" " required />
+                <label class="form-label">Password</label>
+                <!-- Toggle Icon -->
+                <i class="fa-solid fa-eye password-toggle" id="togglePass"></i>
+            </div>
+
+            <!-- Info Button & Hidden Tooltip -->
+            <div class="info-wrapper">
+                <div class="info-btn">
+                    <i class="fa-solid fa-circle-info"></i> Password Requirements
+                </div>
+                
+                <div class="requirements-tooltip">
+                    <div style="margin-bottom:8px; font-weight:bold; color:white; font-size:0.85rem;">Must contain:</div>
+                    <div id="req-len" class="req-item"><i class="fa-solid fa-circle"></i> Min 8 characters</div>
+                    <div id="req-upper" class="req-item"><i class="fa-solid fa-circle"></i> 1 Uppercase letter</div>
+                    <div id="req-num" class="req-item"><i class="fa-solid fa-circle"></i> 1 Number</div>
+                    <div id="req-special" class="req-item"><i class="fa-solid fa-circle"></i> 1 Special (@$!%*?&)</div>
+                </div>
+            </div>
+
+            <!-- Confirm Password Field -->
+            <div class="form-group password-wrapper">
+                <input id="confirmPassInput" name="confirm_password" type="password" class="form-input" placeholder=" " required />
+                <label class="form-label">Confirm Password</label>
+                <!-- Toggle Icon -->
+                <i class="fa-solid fa-eye password-toggle" id="toggleConfirm"></i>
+            </div>
+            <div id="matchMessage" style="font-size: 0.8rem; height: 1.2rem; margin-bottom: 10px; text-align:right;"></div>
+
+            <!-- Register Button -->
+            <button id="btnSubmit" type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 1rem;" disabled>
+                REGISTER PROFILE
+            </button>
+
+            <!-- Error/Success Message -->
+            <div id="signupMessage" style="margin-top: 1rem; text-align: center; color: var(--accent); font-weight: 500;"></div>
+        </form>
+        
+        <p style="text-align: center; margin-top: 1.5rem; color: var(--text-muted);">
+            Already have access? <a href="/" style="color: var(--primary);">Log in</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // --- 1. Elements ---
+    const passInput = document.getElementById('passInput');
+    const confirmInput = document.getElementById('confirmPassInput');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const matchMsg = document.getElementById('matchMessage');
+    
+    // Requirements Logic
+    const reqs = {
+        len: { el: document.getElementById('req-len'), regex: /.{8,}/ },
+        upper: { el: document.getElementById('req-upper'), regex: /[A-Z]/ },
+        num: { el: document.getElementById('req-num'), regex: /\d/ },
+        special: { el: document.getElementById('req-special'), regex: /[@$!%*?&]/ }
+    };
+
+    // --- 2. Password Toggle Logic ---
+    function setupToggle(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        
+        icon.addEventListener('click', () => {
+            const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+            input.setAttribute('type', type);
+            // Toggle Icon Class
+            icon.classList.toggle('fa-eye');
+            icon.classList.toggle('fa-eye-slash');
+        });
+    }
+
+    setupToggle('passInput', 'togglePass');
+    setupToggle('confirmPassInput', 'toggleConfirm');
+
+    // --- 3. Validation Logic ---
+    function updateRequirementUI(key, isValid, isEmpty) {
+        const item = reqs[key].el;
+        const icon = item.querySelector('i');
+        
+        // Reset classes
+        item.classList.remove('valid', 'invalid');
+        icon.className = 'fa-solid fa-circle'; 
+
+        if (isEmpty) {
+            item.style.color = 'var(--text-muted)';
+        } else if (isValid) {
+            item.classList.add('valid'); // Green in Tooltip
+            icon.className = 'fa-solid fa-check-circle';
+        } else {
+            item.classList.add('invalid'); // Red in Tooltip
+            icon.className = 'fa-solid fa-circle-xmark';
+        }
+    }
+
+    function checkForm() {
+        const val = passInput.value;
+        const confirmVal = confirmInput.value;
+        const isEmpty = val.length === 0;
+        
+        let allValid = true;
+
+        // Check each requirement
+        for (const key in reqs) {
+            const isValid = reqs[key].regex.test(val);
+            updateRequirementUI(key, isValid, isEmpty);
+            if (!isValid) allValid = false;
+        }
+
+        // --- UPDATE INPUT TEXT COLOR ---
+        // Reset classes
+        passInput.classList.remove('text-valid', 'text-invalid');
+
+        if (!isEmpty) {
+            if (allValid) {
+                passInput.classList.add('text-valid'); // Green Text
+            } else {
+                passInput.classList.add('text-invalid'); // Red Text
+            }
+        }
+
+        // Check Match
+        let matchValid = false;
+        if(confirmVal.length > 0) {
+            if(val === confirmVal) {
+                matchMsg.textContent = "Passwords match";
+                matchMsg.style.color = "#00ff88";
+                confirmInput.classList.add('text-valid');
+                confirmInput.classList.remove('text-invalid');
+                matchValid = true;
+            } else {
+                matchMsg.textContent = "Passwords do not match";
+                matchMsg.style.color = "#ff4444";
+                confirmInput.classList.add('text-invalid');
+                confirmInput.classList.remove('text-valid');
+                matchValid = false;
+            }
+        } else {
+            matchMsg.textContent = "";
+            confirmInput.classList.remove('text-valid', 'text-invalid');
+        }
+
+        // Enable Submit only if Strong AND Matching
+        btnSubmit.disabled = !(allValid && matchValid);
+    }
+
+    // Attach Listeners
+    passInput.addEventListener('input', checkForm);
+    confirmInput.addEventListener('input', checkForm);
+
+    // --- 4. Submit Logic ---
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const msg = document.getElementById('signupMessage');
+        const formData = new FormData(e.target);
+        
+        if(passInput.value !== confirmInput.value) return;
+
+        const payload = { 
+            username: formData.get('username'), 
+            email: formData.get('email'), 
+            password: formData.get('password') 
+        };
+
+        msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
+        msg.style.color = "var(--accent)";
+
+        try {
+            const res = await postJSON('/api/v1/signup', payload, false);
+            const json = await res.json();
+            
+            if(res.ok) {
+                setToken(json.access_token);
+                msg.innerHTML = '<span style="color:#00ff88">Success! Redirecting...</span>';
+                setTimeout(() => window.location.href = '/dashboard', 1000);
+            } else { 
+                msg.textContent = json.detail || 'Registration failed';
+                msg.style.color = "#ff4d4d";
+            }
+        } catch(err) { 
+            console.error(err);
+            msg.textContent = 'Connection Error';
+            msg.style.color = "#ff4d4d";
+        }
+    });
+
+</script>
+{% endblock %}

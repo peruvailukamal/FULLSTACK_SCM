@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}SCMXpertLite{% endblock %}</title>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            /* Modern Accessible Palette */
+            --bg-start: #071428; /* deep indigo */
+            --bg-end: #021926;   /* near black teal */
+            --accent-1: #2DD4BF; /* teal */
+            --accent-2: #60A5FA; /* soft blue */
+            --accent-3: #FACC15; /* warm yellow */
+            --card-bg: rgba(255,255,255,0.03);
+            --card-border: rgba(255,255,255,0.06);
+            --text-main: #E6F7FA;
+            --text-muted: #9FB4C8;
+            --muted-strong: #7F9DAF;
+            --radius: 12px;
+            --glass: rgba(255,255,255,0.02);
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+
+        html,body { height:100%; }
+        body {
+            min-height:100vh; display:flex; flex-direction:column; color:var(--text-main);
+            background: radial-gradient(600px 300px at 10% 10%, rgba(45,212,191,0.06), transparent),
+                        radial-gradient(500px 250px at 90% 90%, rgba(96,165,250,0.04), transparent),
+                        linear-gradient(180deg, var(--bg-start) 0%, var(--bg-end) 100%);
+            -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; overflow-x:hidden;
+        }
+
+        /* Background image removed — app uses gradient + canvas only */
+
+        .bg-gradient {
+            position:fixed; inset:0; z-index:-2; pointer-events:none; mix-blend-mode:screen;
+            background: linear-gradient(120deg, rgba(45,212,191,0.06), rgba(96,165,250,0.04), rgba(250,204,21,0.02));
+            opacity:0.92; animation: slowShift 18s linear infinite alternate;
+        }
+
+        @keyframes slowShift { from { transform: translateY(0) rotate(0deg);} to { transform: translateY(-6%) rotate(2deg);} }
+
+        @keyframes bgPan { from { background-position: center 42%; } to { background-position: center 58%; } }
+
+        #canvas-bg { position:fixed; inset:0; z-index:-1; pointer-events:none; }
+
+        .navbar { display:flex; justify-content:space-between; align-items:center; padding:1rem 1.5rem; position:sticky; top:0; z-index:50; background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent); border-bottom:1px solid rgba(255,255,255,0.03); }
+        .brand { font-size:1.4rem; font-weight:800; color:var(--text-main); text-decoration:none; display:flex; gap:.6rem; align-items:center; }
+        .brand i { color:var(--accent-3); font-size:1.1rem; }
+
+        .nav-links { display:flex; gap:0.6rem; align-items:center; }
+        .nav-item { color:var(--muted-strong); text-decoration:none; padding:.48rem .8rem; border-radius:10px; transition:all .18s ease; }
+        .nav-item:hover, .nav-item.active { color: #052028; background: linear-gradient(90deg, var(--accent-1), var(--accent-2)); box-shadow: 0 8px 26px rgba(22,163,164,0.08); }
+
+        .btn { padding:.55rem 1.1rem; border-radius:999px; font-weight:700; cursor:pointer; border:none; display:inline-flex; gap:8px; align-items:center; }
+        .btn-primary { background: linear-gradient(90deg,var(--accent-1),var(--accent-2)); color:#042028; box-shadow: 0 8px 30px rgba(12,99,102,0.08); }
+        .btn-ghost { background:transparent; border:1px solid rgba(255,255,255,0.04); color:var(--text-main); }
+
+        .container { max-width:1200px; margin:0 auto; padding:2rem; flex:1; }
+
+        .glass-card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius); padding:1.6rem; box-shadow: 0 10px 30px rgba(2,8,16,0.55); transition:transform .28s ease, box-shadow .28s ease; }
+        .glass-card:hover { transform: translateY(-6px); box-shadow: 0 28px 70px rgba(2,8,16,0.7); }
+
+        @keyframes floatIn { from { opacity:0; transform: translateY(16px);} to { opacity:1; transform: translateY(0);} }
+        .glass-card { animation: floatIn .46s cubic-bezier(.2,.9,.3,1) both; }
+
+        .form-group { margin-bottom:1.25rem; position:relative; }
+        .form-label { position:absolute; left:14px; top:14px; color:var(--text-muted); transition:.18s; font-size:.95rem; }
+        .form-input { width:100%; padding:12px; background: rgba(2,8,14,0.28); border-radius:10px; border:1px solid rgba(255,255,255,0.03); color:var(--text-main); transition: box-shadow .18s, border-color .18s; }
+        .form-input:focus { border-color: var(--accent-2); box-shadow: 0 8px 30px rgba(96,165,250,0.06); outline:none; }
+        .form-input:focus ~ .form-label, .form-input:not(:placeholder-shown) ~ .form-label { top:-10px; left:10px; font-size:.78rem; color:var(--accent-2); background:transparent; padding:0 6px; }
+
+        .grid-layout { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:1rem; }
+
+        footer { text-align:center; padding:1.6rem; border-top:1px solid rgba(255,255,255,0.03); color:var(--muted-strong); font-size:.9rem; margin-top:auto; }
+
+        @media(max-width:768px){ .navbar{ padding:.8rem 1rem;} .glass-card{ padding:1rem;} }
+    </style>
+</head>
+<body>
+    <!-- Programmable Background Canvas -->
+    <canvas id="canvas-bg"></canvas>
+
+    <header class="navbar">
+        <a href="/" class="brand"><i class="fa-solid fa-boxes-stacked"></i> SCMXpertLite</a>
+        <nav class="nav-links" id="nav-menu"></nav>
+    </header>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        &copy; {{ now().year }} SCMXpertLite &bull; Intelligent Logistics
+    </footer>
+
+    <!-- Scripts -->
+    <!-- Google Sign-In removed -->
+    <script>
+        // --- Background: Smooth floating blobs with parallax ---
+        const canvas = document.getElementById('canvas-bg');
+        const ctx = canvas.getContext('2d');
+
+        function fitCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', fitCanvas);
+        fitCanvas();
+
+        const mouse = { x: canvas.width/2, y: canvas.height/2 };
+        window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+        class Blob {
+            constructor() {
+                this.baseX = Math.random() * canvas.width;
+                this.baseY = Math.random() * canvas.height;
+                this.x = this.baseX;
+                this.y = this.baseY;
+                this.radius = 80 + Math.random() * 160;
+                this.h = 160 + Math.random() * 200; // hue shift
+                this.speed = 0.002 + Math.random() * 0.006;
+                this.phase = Math.random() * Math.PI * 2;
+                this.amp = 20 + Math.random() * 60;
+            }
+            update(t) {
+                this.phase += this.speed * t;
+                this.x = this.baseX + Math.cos(this.phase) * this.amp + (mouse.x - canvas.width/2) * 0.02;
+                this.y = this.baseY + Math.sin(this.phase * 0.9) * this.amp + (mouse.y - canvas.height/2) * 0.02;
+            }
+            draw(alpha) {
+                const grad = ctx.createRadialGradient(this.x, this.y, this.radius*0.15, this.x, this.y, this.radius);
+                const c1 = `hsla(${this.h}, 80%, 60%, ${alpha*0.65})`;
+                const c2 = `hsla(${(this.h+40)%360}, 85%, 55%, ${alpha*0.18})`;
+                grad.addColorStop(0, c1);
+                grad.addColorStop(0.5, c2);
+                grad.addColorStop(1, 'rgba(2,6,12,0)');
+
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // create blobs sized to viewport
+        let blobs = [];
+        function createBlobs() {
+            blobs = [];
+            const count = Math.max(3, Math.floor(window.innerWidth / 420));
+            for(let i=0;i<count;i++) blobs.push(new Blob());
+        }
+        createBlobs();
+        window.addEventListener('resize', () => { fitCanvas(); createBlobs(); });
+
+        let last = performance.now();
+        function loop(now) {
+            const dt = now - last || 16;
+            last = now;
+
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+
+            // soft vignette background
+            const g = ctx.createLinearGradient(0,0,0,canvas.height);
+            g.addColorStop(0, 'rgba(2,6,12,0.0)');
+            g.addColorStop(1, 'rgba(2,6,12,0.12)');
+            ctx.fillStyle = g; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+            // draw blobs with varying alpha and parallax
+            blobs.forEach((b, i) => { b.update(dt); b.draw(0.85 - i*0.12); });
+
+            // subtle floating orbs
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+
+        // --- Auth & Navigation (kept from previous version) ---
+        const apiPrefix = '/api/v1';
+        function getToken() { return localStorage.getItem('scm_token'); }
+        function setToken(t) { t ? localStorage.setItem('scm_token', t) : localStorage.removeItem('scm_token'); updateUI(); }
+
+        async function postJSON(url, data, auth=true) {
+            const headers = {'Content-Type':'application/json'};
+            if(auth && getToken()) headers['Authorization'] = 'Bearer ' + getToken();
+            return await fetch(url, {method:'POST', headers, body: JSON.stringify(data)});
+        }
+        async function getJSON(url) {
+            const headers = {};
+            if(getToken()) headers['Authorization'] = 'Bearer ' + getToken();
+            return await fetch(url, {headers});
+        }
+
+        function updateUI() {
+            const nav = document.getElementById('nav-menu');
+            if(getToken()) {
+                nav.innerHTML = `
+                    <a href="/dashboard" class="nav-item"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+                    <a href="/create-shipment" class="nav-item"><i class="fa-solid fa-plus"></i> Create</a>
+                    <a href="/my-shipments" class="nav-item"><i class="fa-solid fa-truck"></i> Shipments</a>
+                    <a href="/data-stream" class="nav-item"><i class="fa-solid fa-wifi"></i> Stream</a>
+                    <a href="/account" class="nav-item"><i class="fa-solid fa-user-astronaut"></i> Account</a>
+                    <button id="btn-logout" class="btn btn-ghost" style="margin-left:10px">Logout</button>
+                `;
+                const btn = document.getElementById('btn-logout');
+                if(btn) btn.addEventListener('click', () => { setToken(null); window.location.href='/'; });
+            } else {
+                nav.innerHTML = `
+                    <a href="/" class="nav-item">Log In</a>
+                    <a href="/signup" class="btn btn-primary">Sign Up</a>
+                `;
+            }
+        }
+        document.addEventListener('DOMContentLoaded', updateUI);
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

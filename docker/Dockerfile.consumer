@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+WORKDIR /consumer
+
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /consumer/requirements.txt
+RUN python -m pip install --upgrade pip && pip install -r /consumer/requirements.txt
+
+COPY kafka/consumer.py /consumer/consumer.py
+COPY backend /consumer/backend_helpers
+
+CMD ["python", "consumer.py"]
